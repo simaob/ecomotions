@@ -18,7 +18,7 @@ class CartoDBClient
       bounding_box_wkt = first_polygon.map{ |c| "#{c.first} #{c.last}" }.join(', ')
       "ST_Centroid(ST_GeomFromText('POLYGON((#{bounding_box_wkt}))', 4326))"
     else
-      nil
+      "ST_GeomFromText('POINT(-1.8262150, 51.1788820)')"
     end
     query = <<-SQL
       INSERT INTO ecomotions_ecohack_2014
@@ -69,17 +69,15 @@ puts since_id.inspect
 twitter_client.search('stonehenge', lang: 'en', since_id: since_id).each do |tweet|
   bounding_box = tweet.place && tweet.place.bounding_box
   is_geolocated = !bounding_box.nil?
-  if is_geolocated
-    politeness_score = barometer.evaluate_politeness(tweet.text)
-    cartodb_client.create_record(
-      'Stonehenge',
-      bounding_box,
-      tweet.text,
-      tweet.url,
-      politeness_score,
-      tweet.created_at
-    )
-  end
+  politeness_score = barometer.evaluate_politeness(tweet.text)
+  cartodb_client.create_record(
+    'Stonehenge',
+    (is_geolocated ? bounding_box : nil),
+    tweet.text,
+    tweet.url,
+    politeness_score,
+    tweet.created_at
+  )
   since_id = tweet.id if tweet.id > since_id
 end
 
