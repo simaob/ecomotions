@@ -62,7 +62,12 @@ end
 cartodb_client = CartoDBClient.new(secrets['cartodb'])
 barometer = PolitenessBarometer.new
 
-twitter_client.search('stonehenge', lang: 'en').each do |tweet|
+<<<<<<< HEAD
+since_id = File.read('data/since_id').to_i
+
+puts since_id.inspect
+
+twitter_client.search('stonehenge', lang: 'en', since_id: since_id).each do |tweet|
   bounding_box = tweet.place && tweet.place.bounding_box
   is_geolocated = !bounding_box.nil?
   if is_geolocated
@@ -76,4 +81,7 @@ twitter_client.search('stonehenge', lang: 'en').each do |tweet|
       tweet.created_at
     )
   end
+  since_id = tweet.id if tweet.id > since_id
 end
+
+File.write('data/since_id', since_id)
