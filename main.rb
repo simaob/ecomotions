@@ -1,3 +1,4 @@
+require 'byebug'
 require 'yaml'
 
 secrets = YAML.load(File.open('config/secrets.yml'))
@@ -8,7 +9,7 @@ class CartoDBClient
     @key = config['key']
   end
 
-  def create_record(protected_area_name, bounding_box, body, url, created_at)
+  def create_record(protected_area_name, bounding_box, body, url, politeness_score, created_at)
     is_geolocated = !bounding_box.nil?
     the_geom = if is_geolocated
       puts bounding_box.coordinates.inspect
@@ -22,7 +23,7 @@ class CartoDBClient
     query = <<-SQL
       INSERT INTO ecomotions_ecohack_2014
       (
-        the_geom, body, is_geolocated, protected_area_name, tweet_url, created_at
+        the_geom, body, is_geolocated, protected_area_name, tweet_url, politeness_score, created_at
       )
       VALUES (
         #{the_geom},
@@ -30,6 +31,7 @@ class CartoDBClient
         #{is_geolocated},
         '#{protected_area_name}',
         '#{url}',
+        '#{politeness_score}',
         TO_DATE('#{created_at}', 'yyyy-mm-dd')
       )
     SQL
@@ -39,8 +41,14 @@ class CartoDBClient
   end
 end
 
+require 'httparty'
 
-
+class PolitenessBarometer
+  def evaluate_politeness text
+    response = HTTParty.post("http://politeness.mpi-sws.org/score-politeness", :body => { text: text })
+    JSON.parse(response.body)["label"]
+  end
+end
 
 
 require 'twitter'
@@ -52,15 +60,20 @@ twitter_client = Twitter::REST::Client.new do |config|
 end
 
 cartodb_client = CartoDBClient.new(secrets['cartodb'])
+barometer = PolitenessBarometer.new
 
-twitter_client.search('#stonehenge', result_type: 'recent', lang: 'en').take(15).each do |tweet|
+twitter_client.search('stonehenge', lang: 'en').each do |tweet|
   bounding_box = tweet.place && tweet.place.bounding_box
   is_geolocated = !bounding_box.nil?
-  cartodb_client.create_record(
-    'Stonehenge',
-    bounding_box,
-    tweet.text,
-    tweet.url,
-    tweet.created_at
-  ) if is_geolocated
+  if is_geolocated
+    politeness_score = barometer.evaluate_politeness(tweet.text)
+    cartodb_client.create_record(
+      'Stonehenge',
+      bounding_box,
+      tweet.text,
+      tweet.url,
+      politeness_score,
+      tweet.created_at
+    )
+  end
 end
