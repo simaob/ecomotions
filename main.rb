@@ -62,7 +62,6 @@ end
 cartodb_client = CartoDBClient.new(secrets['cartodb'])
 barometer = PolitenessBarometer.new
 
-<<<<<<< HEAD
 since_id = File.read('data/since_id').to_i
 
 puts since_id.inspect
